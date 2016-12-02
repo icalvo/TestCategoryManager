@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using System.Threading;
@@ -9,15 +7,12 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.Host;
-using Microsoft.CodeAnalysis.Host.Mef;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace TestCategoryManager
 {
     internal static class Program
     {
-        private static TestCategoryAdder _visitor;
+        private static CSharpSyntaxRewriter _visitor;
 
         private static void Main(string[] args)
         {
@@ -34,6 +29,12 @@ namespace TestCategoryManager
                     break;
                 case "del":
                 case "delete":
+                case "rm":
+                    _visitor = new TestCategoryRemover(category);
+                    break;
+                case "ren":
+                case "rename":
+                case "mv":
                     break;
                 default:
                     throw new Exception();
@@ -79,119 +80,14 @@ namespace TestCategoryManager
             var newDocument = await Formatter.FormatAsync(document.WithSyntaxRoot(newRoot), cancellationToken: token);
             return newDocument.Project.Solution;
         }
-
-        private class TestCategoryAdder : CSharpSyntaxRewriter
-        {
-            private readonly string _category;
-
-            public TestCategoryAdder(string category)
-            {
-                _category = category;
-            }
-
-            public override SyntaxNode VisitMethodDeclaration(MethodDeclarationSyntax node)
-            {
-                if (node.IsTestMethod() & !node.HasTestCategory(_category))
-                {
-                    Console.WriteLine($"-> Adding {_category} category to method {node.Identifier}");
-                    return node.AddCategoryAttribute(_category);
-                }
-
-                return node;
-            }
-        }
-
-        private static bool IsTestMethod(this BaseMethodDeclarationSyntax @this)
-        {
-            var attributeLists = @this.AttributeLists.AsEnumerable() ?? Enumerable.Empty<AttributeListSyntax>();
-            var attributes = attributeLists.SelectMany(x => x.Attributes);
-            return attributes.Any(x => x.Name.ToString() == "TestMethod");
-        }
-
-        private static bool HasTestCategory(this BaseMethodDeclarationSyntax @this, string category)
-        {
-            var attributeLists = @this.AttributeLists.AsEnumerable() ?? Enumerable.Empty<AttributeListSyntax>();
-            var attributes = attributeLists.SelectMany(x => x.Attributes);
-            return attributes.Any(x => x.IsTestCategory(category));
-        }
-
-        private static bool IsTestCategory(this AttributeSyntax @this, string category)
-        {
-            return @this.Name.ToString() == "TestCategory" && @this.ArgumentIsCategory(category);
-        }
-
-        private static bool ArgumentIsCategory(this AttributeSyntax @this, string category)
-        {
-            var literal = LiteralExpression(
-                SyntaxKind.StringLiteralExpression,
-                Literal(category));
-            var arg = @this.ArgumentList.Arguments.First();
-            return arg.Expression.ToString() == literal.ToString();
-        }
-
-        private static MethodDeclarationSyntax AddCategoryAttribute(
-            this MethodDeclarationSyntax @this,
-            string category)
-        {
-            var newTestCategoryAttribute = AttributeList(
-                SingletonSeparatedList(
-                    Attribute(
-                            IdentifierName("TestCategory"))
-                        .WithArgumentList(
-                            AttributeArgumentList(
-                                SingletonSeparatedList(
-                                    AttributeArgument(
-                                        LiteralExpression(
-                                            SyntaxKind.StringLiteralExpression,
-                                            Literal(category)))))))).NormalizeWhitespace();
-            var attributes =
-                @this.AttributeLists.Add(newTestCategoryAttribute);
-
-            return @this.WithAttributeLists(attributes);
-        }
-
-        private static bool IsMsTestTestClassAttribute(SyntaxNodeAnalysisContext context, AttributeSyntax attribute)
-        {
-            var memberSymbol =
-                context.SemanticModel.GetSymbolInfo(attribute).Symbol as IMethodSymbol;
-            const string testClassAttributeName =
-                "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute.TestClassAttribute()";
-            return memberSymbol?.ToString() == testClassAttributeName;
-        }
-    }
-
-
-    public static class AsynchronousEnumerable
-    {
-        public static Task<TResult> AggregateAsync<TSource, TResult>(
-            this IEnumerable<TSource> source,
-            TResult seed,
-            Func<TResult, TSource, Task<TResult>> func)
-        {
-            return source.AggregateAsync(seed, CancellationToken.None, (result, item, token) => func(result, item));
-        }
-
-        public static Task<TResult> AggregateAsync<TSource, TResult>(
-            this IEnumerable<TSource> source,
-            TResult seed,
-            Func<TResult, TSource, CancellationToken, Task<TResult>> func)
-        {
-            return source.AggregateAsync(seed, CancellationToken.None, func);
-        }
-
-        public static async Task<TResult> AggregateAsync<TSource, TResult>(
-            this IEnumerable<TSource> source,
-            TResult seed,
-            CancellationToken token,
-            Func<TResult, TSource, CancellationToken, Task<TResult>> func)
-        {
-            TResult result = seed;
-            foreach (var item in source)
-            {
-                result = await func(result, item, token);
-            }
-
-            return result;
-        }
+        
+        //private static bool IsMsTestTestClassAttribute(SyntaxNodeAnalysisContext context, AttributeSyntax attribute)
+        //{
+        //    var memberSymbol =
+        //        context.SemanticModel.GetSymbolInfo(attribute).Symbol as IMethodSymbol;
+        //    const string testClassAttributeName =
+        //        "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute.TestClassAttribute()";
+        //    return memberSymbol?.ToString() == testClassAttributeName;
+        //}
     }
 }
