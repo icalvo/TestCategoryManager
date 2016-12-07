@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -54,6 +55,11 @@ namespace TestCategoryManager
                 @this.AttributeLists.Add(newTestCategoryAttribute);
 
             return @this.WithAttributeLists(attributes);
+        }
+
+        public static SyntaxList<T> ToSyntaxList<T>(this IEnumerable<T> @this) where T : SyntaxNode
+        {
+            return new SyntaxList<T>().AddRange(@this);
         }
     }
 }

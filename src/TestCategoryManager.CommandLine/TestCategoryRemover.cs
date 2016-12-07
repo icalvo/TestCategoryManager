@@ -21,19 +21,28 @@ namespace TestCategoryManager
                 return node;
             }
 
-            var query = 
+            var newAttributeLists = 
                 from attributeList in node.AttributeLists
-                let nodesToRemove =
-                (from attribute in attributeList.Attributes
-                        where attribute.IsTestCategory(_category)
-                        select attribute)
-                    .ToArray()
-                where nodesToRemove.Length != attributeList.Attributes.Count
-                select attributeList.RemoveNodes(nodesToRemove, SyntaxRemoveOptions.KeepNoTrivia);
+                let attributesToRemove = AttributesToRemove(attributeList.Attributes)
+                where !AllAttributesWillBeRemoved(attributesToRemove, attributeList)
+                select attributeList.RemoveNodes(attributesToRemove, SyntaxRemoveOptions.KeepNoTrivia);
 
-            var newAttributes = new SyntaxList<AttributeListSyntax>();
-            newAttributes.AddRange(query);
-            return node.WithAttributeLists(newAttributes);
+            return node.WithAttributeLists(newAttributeLists.ToSyntaxList());
+        }
+
+
+
+        private AttributeSyntax[] AttributesToRemove(SeparatedSyntaxList<AttributeSyntax> attributeList)
+        {
+            return (from attribute in attributeList
+                    where attribute.IsTestCategory(_category)
+                    select attribute)
+                .ToArray();
+        }
+
+        private static bool AllAttributesWillBeRemoved(AttributeSyntax[] nodesToRemove, AttributeListSyntax attributeList)
+        {
+            return nodesToRemove.Length == attributeList.Attributes.Count;
         }
     }
 }
