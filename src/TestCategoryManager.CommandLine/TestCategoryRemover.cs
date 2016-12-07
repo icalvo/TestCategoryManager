@@ -23,21 +23,11 @@ namespace TestCategoryManager
 
             var newAttributeLists = 
                 from attributeList in node.AttributeLists
-                let attributesToRemove = AttributesToRemove(attributeList.Attributes)
+                let attributesToRemove = attributeList.TestCategoryAttributes(_category)
                 where !AllAttributesWillBeRemoved(attributesToRemove, attributeList)
                 select attributeList.RemoveNodes(attributesToRemove, SyntaxRemoveOptions.KeepNoTrivia);
 
             return node.WithAttributeLists(newAttributeLists.ToSyntaxList());
-        }
-
-
-
-        private AttributeSyntax[] AttributesToRemove(SeparatedSyntaxList<AttributeSyntax> attributeList)
-        {
-            return (from attribute in attributeList
-                    where attribute.IsTestCategory(_category)
-                    select attribute)
-                .ToArray();
         }
 
         private static bool AllAttributesWillBeRemoved(AttributeSyntax[] nodesToRemove, AttributeListSyntax attributeList)
